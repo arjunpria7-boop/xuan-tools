@@ -75,11 +75,10 @@ const handleApiResponse = (
 const callGenerativeModel = async (
     modelName: string, 
     contents: { parts: ({ text: string; } | { inlineData: { mimeType: string; data: string; }; })[] },
-    context: string,
-    apiKey: string
+    context: string
 ): Promise<string> => {
     try {
-        const ai = new GoogleGenAI({ apiKey });
+        const ai = new GoogleGenAI({ apiKey: 'AIzaSyDdVMVSj5ZFGtpm9gJ2GATOp-sjwqIBfA4' });
         
         console.log(`Sending request to model '${modelName}' for ${context}...`);
         const response: GenerateContentResponse = await ai.models.generateContent({
@@ -95,7 +94,7 @@ const callGenerativeModel = async (
                 throw error; // Teruskan kesalahan penagihan secara langsung.
             }
             if (error.message.includes('API key not valid')) {
-                 throw new Error('Kunci API yang Anda berikan tidak valid. Harap periksa di Pengaturan dan coba lagi.');
+                 throw new Error('Kunci API yang dikonfigurasi tidak valid.');
             }
             if (error.message.includes('"code":429') || error.message.includes('RESOURCE_EXHAUSTED')) {
                 throw new BillingError('Anda telah melampaui kuota API Anda (Kesalahan 429). Ini sering terjadi jika penagihan tidak diaktifkan untuk proyek Google Cloud Anda. Harap pastikan penagihan diaktifkan dan coba lagi.');
@@ -112,14 +111,12 @@ const callGenerativeModel = async (
  * @param originalImage The original image file.
  * @param userPrompt The text prompt describing the desired edit.
  * @param hotspot The {x, y} coordinates on the image to focus the edit.
- * @param apiKey The user's Gemini API key.
  * @returns A promise that resolves to the data URL of the edited image.
  */
 export const generateEditedImage = async (
     originalImage: File,
     userPrompt: string,
-    hotspot: { x: number, y: number },
-    apiKey: string
+    hotspot: { x: number, y: number }
 ): Promise<string> => {
     console.log('Starting generative edit at:', hotspot);
     
@@ -139,20 +136,18 @@ Kebijakan Keamanan & Etika:
 Keluaran: Kembalikan HANYA gambar akhir yang telah diedit. Jangan kembalikan teks.`;
     const textPart = { text: prompt };
 
-    return callGenerativeModel('gemini-2.5-flash-image', { parts: [originalImagePart, textPart] }, 'edit', apiKey);
+    return callGenerativeModel('gemini-2.5-flash-image', { parts: [originalImagePart, textPart] }, 'edit');
 };
 
 /**
  * Generates an image with a filter applied using generative AI.
  * @param originalImage The original image file.
  * @param filterPrompt The text prompt describing the desired filter.
- * @param apiKey The user's Gemini API key.
  * @returns A promise that resolves to the data URL of the filtered image.
  */
 export const generateFilteredImage = async (
     originalImage: File,
-    filterPrompt: string,
-    apiKey: string,
+    filterPrompt: string
 ): Promise<string> => {
     console.log(`Starting filter generation: ${filterPrompt}`);
     
@@ -167,20 +162,18 @@ Kebijakan Keamanan & Etika:
 Keluaran: Kembalikan HANYA gambar akhir yang telah difilter. Jangan kembalikan teks.`;
     const textPart = { text: prompt };
 
-    return callGenerativeModel('gemini-2.5-flash-image', { parts: [originalImagePart, textPart] }, 'filter', apiKey);
+    return callGenerativeModel('gemini-2.5-flash-image', { parts: [originalImagePart, textPart] }, 'filter');
 };
 
 /**
  * Generates an image with a global adjustment applied using generative AI.
  * @param originalImage The original image file.
  * @param adjustmentPrompt The text prompt describing the desired adjustment.
- * @param apiKey The user's Gemini API key.
  * @returns A promise that resolves to the data URL of the adjusted image.
  */
 export const generateAdjustedImage = async (
     originalImage: File,
-    adjustmentPrompt: string,
-    apiKey: string,
+    adjustmentPrompt: string
 ): Promise<string> => {
     console.log(`Starting global adjustment generation: ${adjustmentPrompt}`);
     
@@ -199,5 +192,5 @@ Kebijakan Keamanan & Etika:
 Keluaran: Kembalikan HANYA gambar akhir yang telah disesuaikan. Jangan kembalikan teks.`;
     const textPart = { text: prompt };
 
-    return callGenerativeModel('gemini-2.5-flash-image', { parts: [originalImagePart, textPart] }, 'adjustment', apiKey);
+    return callGenerativeModel('gemini-2.5-flash-image', { parts: [originalImagePart, textPart] }, 'adjustment');
 };

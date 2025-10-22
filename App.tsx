@@ -15,7 +15,6 @@ import CropPanel from './components/CropPanel';
 import { UndoIcon, RedoIcon, EyeIcon, ErrorIcon, ZoomInIcon } from './components/icons';
 import StartScreen from './components/StartScreen';
 import PreviewModal from './components/PreviewModal';
-import ApiKeyModal from './components/ApiKeyModal';
 
 // Helper to convert a data URL string to a File object
 const dataURLtoFile = (dataurl: string, filename: string): File => {
@@ -38,9 +37,6 @@ type Tab = 'retus' | 'sesuaikan' | 'filter' | 'potong';
 type ErrorType = 'generic' | 'billing';
 
 const App: React.FC = () => {
-  const [apiKey, setApiKey] = useState<string | null>(null);
-  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
-  
   const [history, setHistory] = useState<File[]>([]);
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
   const [prompt, setPrompt] = useState<string>('');
@@ -56,21 +52,6 @@ const App: React.FC = () => {
   const [isComparing, setIsComparing] = useState<boolean>(false);
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState<boolean>(false);
   const imgRef = useRef<HTMLImageElement>(null);
-
-  useEffect(() => {
-    const savedKey = localStorage.getItem('gemini-api-key');
-    if (savedKey) {
-      setApiKey(savedKey);
-    } else {
-      setIsApiKeyModalOpen(true);
-    }
-  }, []);
-
-  const handleSaveApiKey = (key: string) => {
-    setApiKey(key);
-    localStorage.setItem('gemini-api-key', key);
-    setIsApiKeyModalOpen(false);
-  };
 
   const currentImage = history[historyIndex] ?? null;
   const originalImage = history[0] ?? null;
@@ -135,18 +116,8 @@ const App: React.FC = () => {
     setCompletedCrop(undefined);
   }, []);
 
-  const preflightCheck = () => {
-    if (!apiKey) {
-      setError({ message: 'Kunci API Gemini belum diatur. Silakan atur di pengaturan.', type: 'generic' });
-      setIsApiKeyModalOpen(true);
-      return false;
-    }
-    setError(null);
-    return true;
-  }
-
   const handleGenerate = useCallback(async () => {
-    if (!preflightCheck() || !currentImage || !apiKey) return;
+    if (!currentImage) return;
     
     if (!prompt.trim()) {
         setError({ message: 'Silakan masukkan deskripsi untuk editan Anda.', type: 'generic' });
@@ -162,7 +133,7 @@ const App: React.FC = () => {
     setError(null);
     
     try {
-        const editedImageUrl = await generateEditedImage(currentImage, prompt, editHotspot, apiKey);
+        const editedImageUrl = await generateEditedImage(currentImage, prompt, editHotspot);
         const newImageFile = dataURLtoFile(editedImageUrl, `edited-${Date.now()}.png`);
         addImageToHistory(newImageFile);
         setEditHotspot(null);
@@ -172,16 +143,16 @@ const App: React.FC = () => {
     } finally {
         setIsLoading(false);
     }
-  }, [currentImage, prompt, editHotspot, addImageToHistory, handleError, apiKey]);
+  }, [currentImage, prompt, editHotspot, addImageToHistory, handleError]);
   
   const handleApplyFilter = useCallback(async (filterPrompt: string) => {
-    if (!preflightCheck() || !currentImage || !apiKey) return;
+    if (!currentImage) return;
     
     setIsLoading(true);
     setError(null);
     
     try {
-        const filteredImageUrl = await generateFilteredImage(currentImage, filterPrompt, apiKey);
+        const filteredImageUrl = await generateFilteredImage(currentImage, filterPrompt);
         const newImageFile = dataURLtoFile(filteredImageUrl, `filtered-${Date.now()}.png`);
         addImageToHistory(newImageFile);
     } catch (err) {
@@ -189,16 +160,16 @@ const App: React.FC = () => {
     } finally {
         setIsLoading(false);
     }
-  }, [currentImage, addImageToHistory, handleError, apiKey]);
+  }, [currentImage, addImageToHistory, handleError]);
   
   const handleApplyAdjustment = useCallback(async (adjustmentPrompt: string) => {
-    if (!preflightCheck() || !currentImage || !apiKey) return;
+    if (!currentImage) return;
     
     setIsLoading(true);
     setError(null);
     
     try {
-        const adjustedImageUrl = await generateAdjustedImage(currentImage, adjustmentPrompt, apiKey);
+        const adjustedImageUrl = await generateAdjustedImage(currentImage, adjustmentPrompt);
         const newImageFile = dataURLtoFile(adjustedImageUrl, `adjusted-${Date.now()}.png`);
         addImageToHistory(newImageFile);
     } catch (err) {
@@ -206,7 +177,7 @@ const App: React.FC = () => {
     } finally {
         setIsLoading(false);
     }
-  }, [currentImage, addImageToHistory, handleError, apiKey]);
+  }, [currentImage, addImageToHistory, handleError]);
 
   const handleApplyCrop = useCallback(() => {
     if (!completedCrop || !imgRef.current) {
@@ -557,16 +528,10 @@ const App: React.FC = () => {
   
   return (
     <div className="min-h-screen text-gray-100 flex flex-col">
-      <Header onApiKeyClick={() => setIsApiKeyModalOpen(true)} />
+      <Header />
       <main className={`flex-grow w-full max-w-[1600px] mx-auto p-4 md:p-8 flex justify-center ${currentImage ? 'items-start' : 'items-center'}`}>
         {renderContent()}
       </main>
-      {isApiKeyModalOpen && (
-          <ApiKeyModal 
-              onClose={() => setIsApiKeyModalOpen(false)}
-              onSave={handleSaveApiKey}
-          />
-      )}
       {isPreviewModalOpen && currentImageUrl && (
           <PreviewModal 
               imageUrl={currentImageUrl}

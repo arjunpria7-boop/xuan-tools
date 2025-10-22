@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 import React from 'react';
-import { KeyIcon } from './icons';
 
 const SparkleIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -11,11 +10,7 @@ const SparkleIcon: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
-interface HeaderProps {
-  onApiKeyClick: () => void;
-}
-
-const Header: React.FC<HeaderProps> = ({ onApiKeyClick }) => {
+const Header: React.FC = () => {
   return (
     <header className="w-full py-4 px-4 sm:px-8 border-b border-gray-700 bg-gray-800/30 backdrop-blur-sm sticky top-0 z-50 flex items-center justify-between">
       <div className="flex items-center justify-center gap-3">
@@ -24,14 +19,6 @@ const Header: React.FC<HeaderProps> = ({ onApiKeyClick }) => {
             MediaTama
           </h1>
       </div>
-       <button 
-        onClick={onApiKeyClick}
-        className="flex items-center justify-center text-center bg-white/10 border border-white/20 text-gray-200 font-semibold py-2 px-4 rounded-md transition-all duration-200 ease-in-out hover:bg-white/20 hover:border-white/30 active:scale-95 text-base"
-        aria-label="Atur Kunci API"
-      >
-        <KeyIcon className="w-5 h-5 mr-2" />
-        Pengaturan
-      </button>
     </header>
   );
 };
