@@ -63,7 +63,7 @@ const StartScreen: React.FC<StartScreenProps> = ({ onFileSelect }) => {
           viewBox="0 0 500 100"
           xmlns="http://www.w3.org/2000/svg"
         >
-          <text x="50%" y="50%" dominantBaseline="middle" textAnchor="middle">XUAN tools</text>
+          <text x="50%" y="50%" dominantBaseline="middle" textAnchor="middle">MediaTama</text>
         </svg>
 
         <p className="max-w-2xl text-lg text-gray-400 md:text-xl">

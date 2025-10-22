@@ -6,7 +6,7 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
-import { generateEditedImage, generateFilteredImage, generateAdjustedImage } from './services/geminiService';
+import { generateEditedImage, generateFilteredImage, generateAdjustedImage, BillingError } from './services/geminiService';
 import Header from './components/Header';
 import Spinner from './components/Spinner';
 import FilterPanel from './components/FilterPanel';
@@ -35,13 +35,17 @@ const dataURLtoFile = (dataurl: string, filename: string): File => {
 }
 
 type Tab = 'retus' | 'sesuaikan' | 'filter' | 'potong';
+type ErrorType = 'generic' | 'billing';
 
 const App: React.FC = () => {
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
+  
   const [history, setHistory] = useState<File[]>([]);
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
   const [prompt, setPrompt] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ message: string; type: ErrorType } | null>(null);
   const [editHotspot, setEditHotspot] = useState<{ x: number, y: number } | null>(null);
   const [displayHotspot, setDisplayHotspot] = useState<{ x: number, y: number } | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('retus');
@@ -51,22 +55,28 @@ const App: React.FC = () => {
   const [aspect, setAspect] = useState<number | undefined>();
   const [isComparing, setIsComparing] = useState<boolean>(false);
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState<boolean>(false);
-  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState<boolean>(false);
   const imgRef = useRef<HTMLImageElement>(null);
+
+  useEffect(() => {
+    const savedKey = localStorage.getItem('gemini-api-key');
+    if (savedKey) {
+      setApiKey(savedKey);
+    } else {
+      setIsApiKeyModalOpen(true);
+    }
+  }, []);
+
+  const handleSaveApiKey = (key: string) => {
+    setApiKey(key);
+    localStorage.setItem('gemini-api-key', key);
+    setIsApiKeyModalOpen(false);
+  };
 
   const currentImage = history[historyIndex] ?? null;
   const originalImage = history[0] ?? null;
 
   const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
   const [originalImageUrl, setOriginalImageUrl] = useState<string | null>(null);
-  
-  // On initial load, check if an API key exists. If not, open the modal.
-  useEffect(() => {
-    const key = localStorage.getItem('gemini_api_key');
-    if (!key) {
-      setIsApiKeyModalOpen(true);
-    }
-  }, []);
 
   // Effect to create and revoke object URLs safely for the current image
   useEffect(() => {
@@ -93,23 +103,15 @@ const App: React.FC = () => {
 
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < history.length - 1;
-  
-  const handleSaveApiKey = (apiKey: string) => {
-    localStorage.setItem('gemini_api_key', apiKey);
-    setIsApiKeyModalOpen(false);
-    // If there was an API key error, clear it so the user can try again.
-    if (error?.includes('Kunci API')) {
-      setError(null);
-    }
-  };
 
   const handleError = useCallback((err: unknown) => {
-    const errorMessage = err instanceof Error ? err.message : 'Terjadi kesalahan yang tidak diketahui.';
-    setError(errorMessage);
-    if (errorMessage.includes('Kunci API')) {
-      setIsApiKeyModalOpen(true);
-    }
-    console.error(err);
+      console.error(err);
+      if (err instanceof BillingError) {
+          setError({ message: err.message, type: 'billing' });
+      } else {
+          const errorMessage = err instanceof Error ? err.message : 'Terjadi kesalahan yang tidak diketahui.';
+          setError({ message: errorMessage, type: 'generic' });
+      }
   }, []);
 
   const addImageToHistory = useCallback((newImageFile: File) => {
@@ -133,19 +135,26 @@ const App: React.FC = () => {
     setCompletedCrop(undefined);
   }, []);
 
-  const handleGenerate = useCallback(async () => {
-    if (!currentImage) {
-      setError('Tidak ada gambar yang dimuat untuk diedit.');
-      return;
+  const preflightCheck = () => {
+    if (!apiKey) {
+      setError({ message: 'Kunci API Gemini belum diatur. Silakan atur di pengaturan.', type: 'generic' });
+      setIsApiKeyModalOpen(true);
+      return false;
     }
+    setError(null);
+    return true;
+  }
+
+  const handleGenerate = useCallback(async () => {
+    if (!preflightCheck() || !currentImage || !apiKey) return;
     
     if (!prompt.trim()) {
-        setError('Silakan masukkan deskripsi untuk editan Anda.');
+        setError({ message: 'Silakan masukkan deskripsi untuk editan Anda.', type: 'generic' });
         return;
     }
 
     if (!editHotspot) {
-        setError('Silakan klik pada gambar untuk memilih area yang akan diedit.');
+        setError({ message: 'Silakan klik pada gambar untuk memilih area yang akan diedit.', type: 'generic' });
         return;
     }
 
@@ -153,7 +162,7 @@ const App: React.FC = () => {
     setError(null);
     
     try {
-        const editedImageUrl = await generateEditedImage(currentImage, prompt, editHotspot);
+        const editedImageUrl = await generateEditedImage(currentImage, prompt, editHotspot, apiKey);
         const newImageFile = dataURLtoFile(editedImageUrl, `edited-${Date.now()}.png`);
         addImageToHistory(newImageFile);
         setEditHotspot(null);
@@ -163,19 +172,16 @@ const App: React.FC = () => {
     } finally {
         setIsLoading(false);
     }
-  }, [currentImage, prompt, editHotspot, addImageToHistory, handleError]);
+  }, [currentImage, prompt, editHotspot, addImageToHistory, handleError, apiKey]);
   
   const handleApplyFilter = useCallback(async (filterPrompt: string) => {
-    if (!currentImage) {
-      setError('Tidak ada gambar yang dimuat untuk menerapkan filter.');
-      return;
-    }
+    if (!preflightCheck() || !currentImage || !apiKey) return;
     
     setIsLoading(true);
     setError(null);
     
     try {
-        const filteredImageUrl = await generateFilteredImage(currentImage, filterPrompt);
+        const filteredImageUrl = await generateFilteredImage(currentImage, filterPrompt, apiKey);
         const newImageFile = dataURLtoFile(filteredImageUrl, `filtered-${Date.now()}.png`);
         addImageToHistory(newImageFile);
     } catch (err) {
@@ -183,19 +189,16 @@ const App: React.FC = () => {
     } finally {
         setIsLoading(false);
     }
-  }, [currentImage, addImageToHistory, handleError]);
+  }, [currentImage, addImageToHistory, handleError, apiKey]);
   
   const handleApplyAdjustment = useCallback(async (adjustmentPrompt: string) => {
-    if (!currentImage) {
-      setError('Tidak ada gambar yang dimuat untuk menerapkan penyesuaian.');
-      return;
-    }
+    if (!preflightCheck() || !currentImage || !apiKey) return;
     
     setIsLoading(true);
     setError(null);
     
     try {
-        const adjustedImageUrl = await generateAdjustedImage(currentImage, adjustmentPrompt);
+        const adjustedImageUrl = await generateAdjustedImage(currentImage, adjustmentPrompt, apiKey);
         const newImageFile = dataURLtoFile(adjustedImageUrl, `adjusted-${Date.now()}.png`);
         addImageToHistory(newImageFile);
     } catch (err) {
@@ -203,11 +206,11 @@ const App: React.FC = () => {
     } finally {
         setIsLoading(false);
     }
-  }, [currentImage, addImageToHistory, handleError]);
+  }, [currentImage, addImageToHistory, handleError, apiKey]);
 
   const handleApplyCrop = useCallback(() => {
     if (!completedCrop || !imgRef.current) {
-        setError('Silakan pilih area untuk dipotong.');
+        setError({ message: 'Silakan pilih area untuk dipotong.', type: 'generic' });
         return;
     }
 
@@ -221,7 +224,7 @@ const App: React.FC = () => {
     const ctx = canvas.getContext('2d');
 
     if (!ctx) {
-        setError('Tidak dapat memproses pemotongan.');
+        setError({ message: 'Tidak dapat memproses pemotongan.', type: 'generic' });
         return;
     }
 
@@ -328,12 +331,20 @@ const App: React.FC = () => {
            <div className="text-center animate-fade-in bg-red-500/10 border border-red-500/20 p-8 rounded-lg max-w-2xl mx-auto flex flex-col items-center gap-4">
             <ErrorIcon className="w-12 h-12 text-red-400" />
             <h2 className="text-2xl font-bold text-red-300">Terjadi Kesalahan</h2>
-            <p className="text-md text-red-400 text-center">{error}</p>
+            <p className="text-md text-red-400 text-center">{error.message}</p>
+            {error.type === 'billing' && (
+              <p className="text-sm text-red-400/80 mt-2 text-center">
+                  Untuk informasi lebih lanjut, kunjungi{' '}
+                  <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="underline hover:text-red-300">
+                      Dokumentasi Penagihan Google AI
+                  </a>.
+              </p>
+            )}
             <button
-                onClick={() => error.includes('Kunci API') ? setIsApiKeyModalOpen(true) : setError(null)}
+                onClick={() => setError(null)}
                 className="mt-2 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg text-md transition-colors"
               >
-                {error.includes('Kunci API') ? 'Atur Kunci API' : 'Coba Lagi'}
+                Coba Lagi
             </button>
           </div>
         );
@@ -551,10 +562,10 @@ const App: React.FC = () => {
         {renderContent()}
       </main>
       {isApiKeyModalOpen && (
-        <ApiKeyModal 
-            onClose={() => setIsApiKeyModalOpen(false)}
-            onSave={handleSaveApiKey}
-        />
+          <ApiKeyModal 
+              onClose={() => setIsApiKeyModalOpen(false)}
+              onSave={handleSaveApiKey}
+          />
       )}
       {isPreviewModalOpen && currentImageUrl && (
           <PreviewModal 

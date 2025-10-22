@@ -16,7 +16,6 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave }) => {
   const handleSave = () => {
     if (apiKey.trim()) {
       onSave(apiKey.trim());
-      onClose();
     }
   };
 
@@ -42,7 +41,7 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave }) => {
             <p className="text-gray-400 mb-6">
                 Untuk menggunakan aplikasi ini, Anda memerlukan Kunci API Google Gemini Anda sendiri. Simpan kunci Anda dengan aman. Kunci ini hanya akan disimpan di browser Anda dan tidak pernah dikirim ke server kami.
             </p>
-            <div className="flex flex-col gap-4">
+            <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="flex flex-col gap-4">
                 <input
                     type="password"
                     value={apiKey}
@@ -51,13 +50,13 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave }) => {
                     className="flex-grow bg-gray-900 border border-gray-600 text-gray-200 rounded-lg p-4 focus:ring-2 focus:ring-pink-500 focus:outline-none transition w-full text-base"
                 />
                 <button
-                    onClick={handleSave}
+                    type="submit"
                     disabled={!apiKey.trim()}
                     className="w-full bg-gradient-to-br from-red-600 to-pink-500 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300 ease-in-out shadow-lg shadow-red-500/20 hover:shadow-xl hover:shadow-red-500/40 hover:-translate-y-px active:scale-95 active:shadow-inner text-base disabled:from-gray-600 disabled:to-gray-700 disabled:shadow-none disabled:cursor-not-allowed disabled:transform-none"
                 >
                     Simpan Kunci
                 </button>
-            </div>
+            </form>
             <p className="text-center text-sm text-gray-500 mt-4">
                 Anda bisa mendapatkan kunci dari <a href="https://aistudio.google.com/keys" target="_blank" rel="noopener noreferrer" className="text-pink-400 hover:underline">Google AI Studio</a>.
             </p>
